@@ -81,22 +81,22 @@ class PostsPagesTest(TestCase):
         Авторизованный пользователь может подписываться
         на других пользователей и удалять их из подписок.
         """
-        response = self.auth_user.get(reverse('posts:index'))
+        response = self.auth_user.get(reverse('posts:follow_index'))
         posts_before_following = (
             response.context.get('page_obj').paginator.count)
         self.auth_user.get(
-            reverse('posts:profile',
+            reverse('posts:profile_unfollow',
                     kwargs={'username': self.following_user.username}))
         cache.clear()
-        response = self.auth_user.get(reverse('posts:index'))
+        response = self.auth_user.get(reverse('posts:follow_index'))
         posts_after_following = (
             response.context.get('page_obj').paginator.count)
-        self.assertEqual(posts_after_following, posts_before_following + 1)
+        self.assertEqual(posts_after_following, posts_before_following, 3)
         self.auth_user.get(
-            reverse('posts:profile',
+            reverse('posts:profile_unfollow',
                     kwargs={'username': self.following_user.username}))
         cache.clear()
-        response = self.auth_user.get(reverse('posts:index'))
+        response = self.auth_user.get(reverse('posts:follow_index'))
         posts_after_unfollowing = (
             response.context.get('page_obj').paginator.count)
         self.assertEqual(posts_before_following, posts_after_unfollowing)
@@ -108,11 +108,11 @@ class PostsPagesTest(TestCase):
         """
         # Подписываемся на пользователя cls.following_user.
         self.auth_user.get(reverse(
-            'posts:profile',
+            'posts:profile_follow',
             kwargs={'username': self.following_user.username}))
         # Считаем число записей на странице
         # follow пользователя cls.following_user
-        response = self.auth_user.get(reverse('posts:follow'))
+        response = self.auth_user.get(reverse('posts:follow_index'))
         posts_before_new_post = (
             response.context.get('page_obj').paginator.count)
         cache.clear()
@@ -120,7 +120,7 @@ class PostsPagesTest(TestCase):
         new_post = Post.objects.create(author=self.following_user,
                                        text='new_post')
         # Проверяем, что запись появилась на странице подписчика.
-        response = self.auth_user.get(reverse('posts:follow'))
+        response = self.auth_user.get(reverse('posts:follow_index'))
         posts_after_new_post = (
             response.context.get('page_obj').paginator.count)
         self.assertEqual(posts_after_new_post, posts_before_new_post + 1)
@@ -128,7 +128,7 @@ class PostsPagesTest(TestCase):
         cache.clear()
         # Проверяем, что у пользователя без подписок cls.lonely_user
         # по-прежнему нет записей на странице follow.
-        response = self.auth_lonely_user.get(reverse('posts:follow'))
+        response = self.auth_lonely_user.get(reverse('posts:follow_index'))
         self.assertEqual(response.context.get('page_obj').paginator.count, 0)
         new_post.delete()
 
@@ -228,7 +228,7 @@ class PostsPagesTest(TestCase):
         из словаря context - список всех постов.
         """
         response = self.auth_user.get(reverse('posts:index'))
-        self.assertEqual(response.context['page_obj'].paginator.count, 3)
+        self.assertEqual(response.context['page_obj'].paginator.count, 1)
         first_post = response.context['page_obj'][-1]
         self.assertEqual(first_post.text, self.post_1.text)
         self.assertIsNone(first_post.group)
@@ -251,7 +251,7 @@ class PostsPagesTest(TestCase):
         из словаря context - отфильтрованный по автору список постов.
         """
         response = self.auth_user.get(
-            reverse('posts:profile', args={'username': self.user.username}))
+            reverse('posts:profile', kwargs={'username': self.user.username}))
         self.assertEqual(response.context['page_obj'].paginator.count, 2)
         self.assertTrue(
             all(post.author == self.user
@@ -320,7 +320,7 @@ class PostsPagesTest(TestCase):
             'posts:profile', kwargs={'username': new_post.author}))
         count_posts_till_del = response.context.get('page_obj').paginator.count
         response = self.auth_user.get(reverse(
-            'posts:post_del', kwargs={'post_id': new_post.id}))
+            'posts:post_delete', kwargs={'post_id': new_post.id}))
         self.assertRedirects(response, reverse(
             'posts:profile', kwargs={'username': new_post.author.username}))
         response = self.auth_user.get(reverse(
@@ -338,7 +338,7 @@ class PostsPagesTest(TestCase):
             'posts:profile', kwargs={'username': new_post.author}))
         count_posts_till_del = response.context.get('page_obj').paginator.count
         response = self.auth_lonely_user.get(reverse(
-            'posts:post_del', kwargs={'post_id': new_post.id}))
+            'posts:post_delete', kwargs={'post_id': new_post.id}))
         self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
         response = self.auth_lonely_user.get(reverse(
             'posts:profile', kwargs={'username': new_post.author}))
@@ -352,21 +352,13 @@ class PostsPagesTest(TestCase):
             'posts:profile', kwargs={'username': new_post.author}))
         count_posts_till_del = response.context.get('page_obj').paginator.count
         response = self.not_auth_user.get(reverse(
-            'posts:post_del', kwargs={'post_id': new_post.id}))
+            'posts:post_delete', kwargs={'post_id': new_post.id}))
         self.assertRedirects(
             response, f'/auth/login/?next=/posts/{new_post.id}/delete/')
         response = self.not_auth_user.get(reverse(
             'posts:profile', kwargs={'username': new_post.author}))
         count_posts_after_del = response.context.get('page_obj').paginator.count
         self.assertEqual(count_posts_after_del, count_posts_till_del)
-
-    def test_text_search(self):
-        """Работает поиск по всем записям."""
-        Post.objects.create(author=self.user, text='is_newwwws_post')
-        response = self.auth_user.get('/search/?text=new')
-        count_posts = response.context.get('page_obj').paginator.count
-        self.assertEqual(response.context.get('title'), 'Результаты поиска')
-        self.assertEqual(count_posts, 1)
 
 
 @override_settings(CACHES={

@@ -95,6 +95,7 @@ def post_edit(request, post_id):
         'form': form,
         'is_edit': True,
         'post': post,
+        'post_id': post_id,
     }
     return render(request, 'posts/post_create.html', context)
 
@@ -128,7 +129,11 @@ def follow_index(request):
             (Post.objects.select_related('author').select_related('group')
              .filter(author__following__user=request.user)))
         cache.set('follow_posts', follow_posts, 20)
-    return render(request, 'posts/follow.html', request, follow_posts)
+    page_obj = get_paginator(request, follow_posts)
+    context = {
+        'page_obj': page_obj,
+    }
+    return render(request, 'posts/follow.html', context)
 
 
 @login_required

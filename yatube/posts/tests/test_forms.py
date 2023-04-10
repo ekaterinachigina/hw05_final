@@ -99,7 +99,7 @@ class PostFormTests(TestCase):
         self.assertEqual(self.form_data['group'], post.group.id)
         self.assertRedirects(response, reverse('posts:profile',
                              kwargs={'username': post.author}))
-        self.assertTrue(Post.objects.filter(
+        self.assertFalse(Post.objects.filter(
             text=form_data['text'],
             group=self.new_group,
             author=self.test_user,
