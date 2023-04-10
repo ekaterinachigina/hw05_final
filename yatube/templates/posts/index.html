@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% load cache %}
+{% block title %}
+  Последние обновления на сайте
+{% endblock %}
+{% block content %}
+  <div class="container py-5">
+    <h3 style="margin-bottom: 40px">{{ title }}</h3>
+    {% include 'includes/switcher.html' with main=True %}
+    {% cache 20 index_page page_obj %}
+    {% for post in page_obj %}
+    {% include 'includes/single_post.html' %}
+    {% endfor %}
+    {% include 'includes/paginator.html' %}
+  </div>
+{% endcache %}
+{% endblock %}
