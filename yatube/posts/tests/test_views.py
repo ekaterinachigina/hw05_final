@@ -325,7 +325,8 @@ class PostsPagesTest(TestCase):
             'posts:profile', kwargs={'username': new_post.author.username}))
         response = self.auth_user.get(reverse(
             'posts:profile', kwargs={'username': new_post.author}))
-        count_posts_after_del = response.context.get('page_obj').paginator.count
+        count_posts_after_del = response.context.get(
+            'page_obj').paginator.count
         self.assertEqual(count_posts_after_del, count_posts_till_del - 1)
 
     def test_non_author_cant_delete_post(self):
@@ -342,7 +343,8 @@ class PostsPagesTest(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
         response = self.auth_lonely_user.get(reverse(
             'posts:profile', kwargs={'username': new_post.author}))
-        count_posts_after_del = response.context.get('page_obj').paginator.count
+        count_posts_after_del = response.context.get(
+            'page_obj').paginator.count
         self.assertEqual(count_posts_after_del, count_posts_till_del)
 
     def test_non_auth_user_cant_delete_post(self):
@@ -357,7 +359,8 @@ class PostsPagesTest(TestCase):
             response, f'/auth/login/?next=/posts/{new_post.id}/delete/')
         response = self.not_auth_user.get(reverse(
             'posts:profile', kwargs={'username': new_post.author}))
-        count_posts_after_del = response.context.get('page_obj').paginator.count
+        count_posts_after_del = response.context.get(
+            'page_obj').paginator.count
         self.assertEqual(count_posts_after_del, count_posts_till_del)
 
 
