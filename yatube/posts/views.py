@@ -1,7 +1,6 @@
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.core.cache import cache
-from django.core.exceptions import PermissionDenied
 from django.db.models import Q, Count
 
 from .models import Group, Post, User, Follow
@@ -103,8 +102,6 @@ def post_edit(request, post_id):
 @login_required
 def post_delete(request, post_id):
     post = get_object_or_404(Post, pk=post_id)
-    if request.user != post.author:
-        raise PermissionDenied('Удалить запись может только автор')
     post.delete()
     return redirect('posts:profile', post.author.username)
 
