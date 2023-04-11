@@ -128,7 +128,6 @@ def follow_index(request):
         follow_posts = (
             (Post.objects.select_related('author').select_related('group')
              .filter(author__following__user=request.user)))
-        cache.set('follow_posts', follow_posts, 20)
     page_obj = get_paginator(request, follow_posts)
     context = {
         'page_obj': page_obj,
@@ -140,9 +139,8 @@ def follow_index(request):
 def profile_follow(request, username):
     author = get_object_or_404(User, username=username)
     user = request.user
-    if user == author:
-        raise PermissionDenied()
-    Follow.objects.get_or_create(user=request.user, author=author)
+    if user != author:
+        Follow.objects.get_or_create(user=request.user, author=author)
     return render(request, 'posts/follow.html')
 
 
