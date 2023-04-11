@@ -17,6 +17,7 @@
 action="{% if is_edit %} {% url 'posts:post_edit' post.pk %}
 {% else %} {% url 'posts:post_create' %} {% endif %}">
 {% csrf_token %}
+{% for field in form %}
   <div class="form-group row my-3 p-3">
   <label for="id_text">
     Текст поста
@@ -40,6 +41,7 @@ action="{% if is_edit %} {% url 'posts:post_edit' post.pk %}
     Группа, к которой будет относиться пост
   </small>
   </div>
+  {% endfor %}
   <div class="d-flex justify-content-end">
   <button type="submit" class="btn btn-primary">
   {% if is_edit %}

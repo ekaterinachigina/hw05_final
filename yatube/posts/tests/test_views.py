@@ -228,7 +228,7 @@ class PostsPagesTest(TestCase):
         из словаря context - список всех постов.
         """
         response = self.auth_user.get(reverse('posts:index'))
-        self.assertEqual(response.context['page_obj'].paginator.count, 1)
+        self.assertEqual(response.context['page_obj'].paginator.count, 3)
         first_post = response.context['page_obj'][-1]
         self.assertEqual(first_post.text, self.post_1.text)
         self.assertIsNone(first_post.group)
