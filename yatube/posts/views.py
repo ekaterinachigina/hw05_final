@@ -100,13 +100,6 @@ def post_edit(request, post_id):
 
 
 @login_required
-def post_delete(request, post_id):
-    post = get_object_or_404(Post, pk=post_id)
-    post.delete()
-    return redirect('posts:profile', post.author.username)
-
-
-@login_required
 def add_comment(request, post_id):
     post = Post.objects.get()
     form = CommentForm(request.POST or None)
