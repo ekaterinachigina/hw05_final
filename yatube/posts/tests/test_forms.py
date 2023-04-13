@@ -61,6 +61,14 @@ class PostFormTests(TestCase):
         cls.test_user = User.objects.create(
             username='test_user'
         )
+        cls.profile = reverse('posts:profile',
+                              kwargs={'username': cls.post.author})
+        cls.post_detail = reverse('posts:post_detail',
+                                  args=[PostFormTests.post.id])
+        cls.post_detail_1 = reverse('posts:post_detail',
+                                    kwargs={'post_id': cls.post.id})
+        cls.add_comment = reverse('posts:add_comment',
+                                  kwargs={'post_id': cls.post.id})
 
     @classmethod
     def tearDownClass(cls):
@@ -92,38 +100,42 @@ class PostFormTests(TestCase):
         self.assertEqual(self.form_data['text'], post.text,
                          'Текст не совпадает!')
         self.assertEqual(self.form_data['group'], post.group.id)
-        self.assertRedirects(response, reverse('posts:profile',
-                             kwargs={'username': post.author}))
+        self.assertRedirects(response, self.profile)
         self.assertTrue(Post.objects.filter(
             text=self.form_data['text'],
             group=self.new_group,
             author=self.author,
             image='posts/post.bmp',
-        ).exists())
+        ))
 
     def test_edit_post_in_form(self):
         """Отредактированная запись сохраняется в БД."""
-        self.form_data = {'text': 'Другой текст',
-                          'group': self.second_group.id, }
-        response = self.authorized_client.post(self.post_edit,
-                                               data=self.form_data,
-                                               follow=True)
+        self.form_data = {
+            'text': 'Другой текст',
+            'group': self.second_group.id,
+        }
+        response = self.authorized_client.post(
+            self.post_edit,
+            data=self.form_data,
+            follow=True
+        )
         self.post.refresh_from_db()
         self.assertEqual(self.post.text, self.form_data['text'])
         self.assertEqual(self.post.group.id, self.form_data['group'])
-        self.assertRedirects(response, reverse('posts:post_detail',
-                                               args=[PostFormTests.post.id]))
+        self.assertRedirects(response, self.post_detail)
 
     def test_add_comment(self):
         """
         После успешного добавления комментарий
         появляется на странице записи.
         """
-        page = reverse('posts:post_detail', kwargs={'post_id': self.post.id})
+        page = self.post_detail_1
         comments_count = Comment.objects.filter(post=self.post.id).count()
-        comment_form_data = {'text': 'new_test_comment', }
+        comment_form_data = {
+            'text': 'new_test_comment',
+        }
         response = self.auth_user.post(
-            reverse('posts:add_comment', kwargs={'post_id': self.post.id}),
+            self.add_comment,
             data=comment_form_data,
             follow=True
         )

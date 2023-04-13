@@ -32,6 +32,10 @@ class PostModelTest(TestCase):
             author=cls.user,
             text='comment',
         )
+        cls.post_detail = reverse('posts:post_detail',
+                                  kwargs={'post_id': cls.post.id})
+        cls.group_list = reverse('posts:group_list',
+                                 kwargs={'slug': cls.group.slug})
 
     def test_models_have_correct_object_names(self):
         """Проверяем, что у моделей корректно работает __str__."""
@@ -75,10 +79,8 @@ class PostModelTest(TestCase):
         на страницу группы и детали записи соответственно.
         """
         expected_urls_by_method = {
-            self.post: reverse('posts:post_detail',
-                               kwargs={'post_id': self.post.id}),
-            self.group: reverse('posts:group_list',
-                                kwargs={'slug': self.group.slug})
+            self.post: self.post_detail,
+            self.group: self.group_list,
         }
         for model, expected_url in expected_urls_by_method.items():
             self.assertEqual(model.get_absolute_url(), expected_url)

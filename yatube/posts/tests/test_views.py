@@ -22,6 +22,8 @@ MAIN_PAGE = reverse('posts:index')
 
 POST_CREATE = reverse('posts:post_create')
 
+FOLLOW_INDEX = reverse('posts:follow_index')
+
 
 @override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
 class PostsPagesTest(TestCase):
@@ -51,28 +53,59 @@ class PostsPagesTest(TestCase):
         cls.following_user = User.objects.create_user(username='following')
         # Пользователь без подписчиков и подписок
         cls.lonely_user = User.objects.create_user(username='lonely')
-        cls.group_1 = Group.objects.create(title='test_group_1', slug='slug_1')
-        cls.group_2 = Group.objects.create(title='test_group_2', slug='slug_2')
-        cls.post_1 = Post.objects.create(author=cls.user,
-                                         text='text_post_1')
-        cls.post_2 = Post.objects.create(author=cls.following_user,
-                                         group=cls.group_1,
-                                         text='text_post_2')
-        cls.post_3 = Post.objects.create(author=cls.user,
-                                         group=cls.group_2,
-                                         text='text_post_3',
-                                         image=image)
-        cls.comment = Comment.objects.create(post=cls.post_3,
-                                             author=cls.user,
-                                             text='comment')
-        cls.group_list = reverse('posts:group_list',
-                                 kwargs={'slug': cls.group_1.slug})
+        cls.author = User.objects.create_user(username='auth')
+        cls.group_1 = Group.objects.create(
+            title='test_group_1',
+            slug='slug_1'
+        )
+        cls.group_2 = Group.objects.create(
+            title='test_group_2',
+            slug='slug_2'
+        )
+        cls.post_1 = Post.objects.create(
+            author=cls.user,
+            text='text_post_1'
+        )
+        cls.post_2 = Post.objects.create(
+            author=cls.following_user,
+            group=cls.group_1,
+            text='text_post_2'
+        )
+        cls.post_3 = Post.objects.create(
+            author=cls.user,
+            group=cls.group_2,
+            text='text_post_3',
+            image=image
+        )
+        cls.comment = Comment.objects.create(
+            post=cls.post_3,
+            author=cls.user,
+            text='comment'
+        )
+        cls.new_post = Post.objects.create(
+            author=cls.user,
+            text='new_post'
+        )
+        cls.group_list_1 = reverse('posts:group_list',
+                                   kwargs={'slug': cls.group_1.slug})
+        cls.group_list_2 = reverse('posts:group_list',
+                                   kwargs={'slug': cls.group_2.slug})
         cls.profile = reverse('posts:profile',
                               kwargs={'username': cls.user.username})
-        cls.post_detail = reverse('posts:post_detail',
-                                  kwargs={'post_id': cls.post_1.id})
+        cls.profile_new = reverse('posts:profile',
+                                  kwargs={'username': cls.author})
+        cls.post_detail_1 = reverse('posts:post_detail',
+                                    kwargs={'post_id': cls.post_1.id})
+        cls.post_detail_3 = reverse('posts:post_detail',
+                                    kwargs={'post_id': cls.post_3.id})
         cls.post_edit = reverse('posts:post_edit',
                                 kwargs={'post_id': cls.post_1.id})
+        cls.profile_follow = reverse('posts:profile_follow',
+                                     kwargs={'username':
+                                             cls.following_user.username})
+        cls.profile_unfollow = reverse('posts:profile_unfollow',
+                                       kwargs={'username':
+                                               cls.following_user.username})
 
     @classmethod
     def tearDownClass(cls):
@@ -96,9 +129,9 @@ class PostsPagesTest(TestCase):
             '/not_exists_page/': 'core/404.html',
             MAIN_PAGE: 'posts/index.html',
             POST_CREATE: 'posts/post_create.html',
-            self.group_list: 'posts/group_list.html',
+            self.group_list_1: 'posts/group_list.html',
             self.profile: 'posts/profile.html',
-            self.post_detail: 'posts/post_detail.html',
+            self.post_detail_1: 'posts/post_detail.html',
             self.post_edit: 'posts/post_create.html',
         }
         for reverse_name, template in templates_page_names.items():
@@ -111,22 +144,18 @@ class PostsPagesTest(TestCase):
         Авторизованный пользователь может подписываться
         на других пользователей и удалять их из подписок.
         """
-        response = self.auth_user.get(reverse('posts:follow_index'))
+        response = self.auth_user.get(FOLLOW_INDEX)
         posts_before_following = (
             response.context.get('page_obj').paginator.count)
-        self.auth_user.get(
-            reverse('posts:profile_unfollow',
-                    kwargs={'username': self.following_user.username}))
+        self.auth_user.get(self.profile_unfollow)
         cache.clear()
-        response = self.auth_user.get(reverse('posts:follow_index'))
+        response = self.auth_user.get(FOLLOW_INDEX)
         posts_after_following = (
             response.context.get('page_obj').paginator.count)
         self.assertEqual(posts_after_following, posts_before_following, 3)
-        self.auth_user.get(
-            reverse('posts:profile_unfollow',
-                    kwargs={'username': self.following_user.username}))
+        self.auth_user.get(self.profile_unfollow)
         cache.clear()
-        response = self.auth_user.get(reverse('posts:follow_index'))
+        response = self.auth_user.get(FOLLOW_INDEX)
         posts_after_unfollowing = (
             response.context.get('page_obj').paginator.count)
         self.assertEqual(posts_before_following, posts_after_unfollowing)
@@ -137,20 +166,20 @@ class PostsPagesTest(TestCase):
         и не отображается на странице подписок других пользователей.
         """
         # Подписываемся на пользователя cls.following_user.
-        self.auth_user.get(reverse(
-            'posts:profile_follow',
-            kwargs={'username': self.following_user.username}))
+        self.auth_user.get(self.profile_follow)
         # Считаем число записей на странице
         # follow пользователя cls.following_user
-        response = self.auth_user.get(reverse('posts:follow_index'))
+        response = self.auth_user.get(FOLLOW_INDEX)
         posts_before_new_post = (
             response.context.get('page_obj').paginator.count)
         cache.clear()
         # Создаем новую запись у пользователя cls.following_user.
-        new_post = Post.objects.create(author=self.following_user,
-                                       text='new_post')
+        new_post = Post.objects.create(
+            author=self.following_user,
+            text='new_post'
+        )
         # Проверяем, что запись появилась на странице подписчика.
-        response = self.auth_user.get(reverse('posts:follow_index'))
+        response = self.auth_user.get(FOLLOW_INDEX)
         posts_after_new_post = (
             response.context.get('page_obj').paginator.count)
         self.assertEqual(posts_after_new_post, posts_before_new_post + 1)
@@ -158,7 +187,7 @@ class PostsPagesTest(TestCase):
         cache.clear()
         # Проверяем, что у пользователя без подписок cls.lonely_user
         # по-прежнему нет записей на странице follow.
-        response = self.auth_lonely_user.get(reverse('posts:follow_index'))
+        response = self.auth_lonely_user.get(FOLLOW_INDEX)
         self.assertEqual(response.context.get('page_obj').paginator.count, 0)
         new_post.delete()
 
@@ -167,9 +196,7 @@ class PostsPagesTest(TestCase):
         Пользователь не может подписаться на самого себя.
         """
         folowing_count_after = Follow.objects.filter(user=self.user).count()
-        self.auth_user.get(reverse(
-            'posts:profile',
-            args={'username': self.user.username}))
+        self.auth_user.get(self.profile)
         folowing_count_before = Follow.objects.filter(user=self.user).count()
         self.assertEqual(folowing_count_before, folowing_count_after)
 
@@ -180,14 +207,14 @@ class PostsPagesTest(TestCase):
         и выводится на главную страницу.
         """
         new_post = Post.objects.create(author=self.user, text='test_cache')
-        response = self.auth_user.get(reverse('posts:index'))
+        response = self.auth_user.get(MAIN_PAGE)
         content_before_the_del = response.content
         new_post.delete()
-        response = self.auth_user.get(reverse('posts:index'))
+        response = self.auth_user.get(MAIN_PAGE)
         content_after_the_del = response.content
         self.assertEqual(content_after_the_del, content_before_the_del)
         cache.clear()
-        response = self.auth_user.get(reverse('posts:index'))
+        response = self.auth_user.get(MAIN_PAGE)
         content_after_clear_cache = response.content
         self.assertNotEqual(content_after_clear_cache, content_before_the_del)
 
@@ -197,9 +224,9 @@ class PostsPagesTest(TestCase):
         в словарь context передается запись с картинкой (cls.post_3).
         """
         pages = (
-            reverse('posts:index'),
-            reverse('posts:group_list', kwargs={'slug': self.group_2.slug}),
-            reverse('posts:profile', kwargs={'username': self.user.username}),
+            MAIN_PAGE,
+            self.group_list_2,
+            self.profile,
         )
         for page in pages:
             with self.subTest(page=page):
@@ -213,8 +240,7 @@ class PostsPagesTest(TestCase):
         (cls.post_3)
         с картинкой, комментарии и форма для комментариев.
         """
-        post_detail_page = reverse('posts:post_detail',
-                                   kwargs={'post_id': self.post_3.id})
+        post_detail_page = (self.post_detail_3)
         response = self.auth_user.get(post_detail_page)
         context = ('post', 'comments', 'comment_form')
         for obj in context:
@@ -232,8 +258,8 @@ class PostsPagesTest(TestCase):
         На главной странице отображаются правильные данные
         из словаря context - список всех постов.
         """
-        response = self.auth_user.get(reverse('posts:index'))
-        self.assertEqual(response.context['page_obj'].paginator.count, 3)
+        response = self.auth_user.get(MAIN_PAGE)
+        self.assertEqual(response.context['page_obj'].paginator.count, 4)
         first_post = response.context['page_obj'][-1]
         self.assertEqual(first_post.text, self.post_1.text)
         self.assertIsNone(first_post.group)
@@ -243,8 +269,7 @@ class PostsPagesTest(TestCase):
         На странице группы отображается правильные данные
         из словаря context - отфильтрованный по группе список постов.
         """
-        response = self.auth_user.get(
-            reverse('posts:group_list', kwargs={'slug': self.group_1.slug}))
+        response = self.auth_user.get(self.group_list_1)
         self.assertEqual(response.context['page_obj'].paginator.count, 1)
         self.assertTrue(
             all(post.group == self.group_1
@@ -255,17 +280,15 @@ class PostsPagesTest(TestCase):
         На странице пользователя отображается корректные данные
         из словаря context - отфильтрованный по автору список постов.
         """
-        response = self.auth_user.get(
-            reverse('posts:profile', kwargs={'username': self.user.username}))
-        self.assertEqual(response.context['page_obj'].paginator.count, 2)
+        response = self.auth_user.get(self.profile)
+        self.assertEqual(response.context['page_obj'].paginator.count, 3)
         self.assertTrue(
             all(post.author == self.user
                 for post in response.context['page_obj']))
 
     def test_post_edit_page_has_correct_context(self):
         """На страницу редактирования записи передается форма."""
-        response = self.auth_user.get(
-            reverse('posts:post_edit', kwargs={'post_id': self.post_1.id}))
+        response = self.auth_user.get(self.post_edit)
         form_fields = {
             'text': forms.fields.CharField,
             'group': forms.fields.ChoiceField
@@ -280,7 +303,7 @@ class PostsPagesTest(TestCase):
 
     def test_post_create_page_has_correct_context(self):
         """На страницу создания записи передается форма."""
-        response = self.auth_user.get(reverse('posts:post_create'))
+        response = self.auth_user.get(POST_CREATE)
         form_fields = {
             'text': forms.fields.CharField,
             'group': forms.fields.ChoiceField
@@ -296,9 +319,9 @@ class PostsPagesTest(TestCase):
         странице автора и странице группы.
         """
         pages_with_post_with_group_1 = (
-            reverse('posts:index'),
-            reverse('posts:group_list', kwargs={'slug': self.group_2.slug}),
-            reverse('posts:profile', kwargs={'username': self.user.username})
+            MAIN_PAGE,
+            self.group_list_2,
+            self.profile,
         )
         for page in pages_with_post_with_group_1:
             with self.subTest(page=page):
@@ -311,8 +334,7 @@ class PostsPagesTest(TestCase):
         На странице группы отображатся только принадлежащие
         этой группе записи.
         """
-        response_group_1 = self.auth_user.get(
-            reverse('posts:group_list', kwargs={'slug': self.group_1.slug}))
+        response_group_1 = self.auth_user.get(self.group_list_1)
         self.assertTrue(all(post.group == self.group_1
                             for post in response_group_1.context['page_obj']))
         self.assertFalse(any(post.group == self.group_2
@@ -320,12 +342,9 @@ class PostsPagesTest(TestCase):
 
     def test_non_auth_user_cant_delete_post(self):
         """Не авторизованный пользовтаель не может удалить запись."""
-        new_post = Post.objects.create(author=self.user, text='new_post')
-        response = self.not_auth_user.get(reverse(
-            'posts:profile', kwargs={'username': new_post.author}))
+        response = self.not_auth_user.get(self.profile_new)
         count_posts_till_del = response.context.get('page_obj').paginator.count
-        response = self.not_auth_user.get(reverse(
-            'posts:profile', kwargs={'username': new_post.author}))
+        response = self.not_auth_user.get(self.profile_new)
         count_posts_after_del = response.context.get(
             'page_obj').paginator.count
         self.assertEqual(count_posts_after_del, count_posts_till_del)
@@ -349,6 +368,10 @@ class TestPaginatorViews(TestCase):
                      author=cls.user,
                      group=cls.group_1))
         Post.objects.bulk_create(post_list)
+        cls.group_list = reverse('posts:group_list',
+                                 kwargs={'slug': cls.group_1.slug})
+        cls.profile = reverse('posts:profile',
+                              kwargs={'username': cls.user.username})
 
     def setUp(self):
         self.anon_user = Client()
@@ -359,9 +382,9 @@ class TestPaginatorViews(TestCase):
         записей на страницу.
         """
         pages_with_paginator = (
-            reverse('posts:index'),
-            reverse('posts:group_list', kwargs={'slug': self.group_1.slug}),
-            reverse('posts:profile', kwargs={'username': self.user.username})
+            MAIN_PAGE,
+            self.group_list,
+            self.profile,
         )
         for page in pages_with_paginator:
             with self.subTest(page=page):
