@@ -75,35 +75,30 @@ class PostFormTests(TestCase):
 
     def test_post_form_create_new_post(self):
         """Новая запись с картинкой сохраняется в БД."""
-        self.form_data = {'text': 'Другой текст',
-                          'group': self.new_group.id, }
         posts_count = Post.objects.count()
         image = self.get_image_for_test('post.bmp')
-        form_data = {
+        self.form_data = {
             'text': 'text_post_2',
             'group': self.new_group.id,
             'image': image
         }
-        ids = list(Post.objects.all().values_list('id', flat=True))
         response = self.authorized_client.post(
             POST_CREATE,
             data=self.form_data,
             follow=True
         )
         self.assertEqual(Post.objects.count(), posts_count + 1)
-        posts = Post.objects.exclude(id__in=ids)
-        self.assertEqual(posts.count(), 1)
-        post = posts[0]
+        post = Post.objects.latest('id')
         self.assertEqual(self.form_data['text'], post.text,
                          'Текст не совпадает!')
         self.assertEqual(self.form_data['group'], post.group.id)
         self.assertRedirects(response, reverse('posts:profile',
                              kwargs={'username': post.author}))
-        self.assertFalse(Post.objects.filter(
-            text=form_data['text'],
+        self.assertTrue(Post.objects.filter(
+            text=self.form_data['text'],
             group=self.new_group,
             author=self.test_user,
-            image='posts/post.bmp'
+            image='posts/post.bmp',
         ).exists())
 
     def test_edit_post_in_form(self):

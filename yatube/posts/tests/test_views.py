@@ -18,6 +18,10 @@ User = get_user_model()
 
 TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
 
+MAIN_PAGE = reverse('posts:index')
+
+POST_CREATE = reverse('posts:post_create')
+
 
 @override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
 class PostsPagesTest(TestCase):
@@ -61,6 +65,14 @@ class PostsPagesTest(TestCase):
         cls.comment = Comment.objects.create(post=cls.post_3,
                                              author=cls.user,
                                              text='comment')
+        cls.group_list = reverse('posts:group_list',
+                                 kwargs={'slug': cls.group_1.slug})
+        cls.profile = reverse('posts:profile',
+                              kwargs={'username': cls.user.username})
+        cls.post_detail = reverse('posts:post_detail',
+                                  kwargs={'post_id': cls.post_1.id})
+        cls.post_edit = reverse('posts:post_edit',
+                                kwargs={'post_id': cls.post_1.id})
 
     @classmethod
     def tearDownClass(cls):
@@ -74,6 +86,25 @@ class PostsPagesTest(TestCase):
         self.auth_lonely_user = Client()
         self.auth_lonely_user.force_login(self.lonely_user)
         self.not_auth_user = Client()
+
+    def test_pages_uses_correct_template(self):
+        """
+        Во view-функциях используются соответствующие шаблоны.
+        Переопределена страница 404.
+        """
+        templates_page_names = {
+            '/not_exists_page/': 'core/404.html',
+            MAIN_PAGE: 'posts/index.html',
+            POST_CREATE: 'posts/post_create.html',
+            self.group_list: 'posts/group_list.html',
+            self.profile: 'posts/profile.html',
+            self.post_detail: 'posts/post_detail.html',
+            self.post_edit: 'posts/post_create.html',
+        }
+        for reverse_name, template in templates_page_names.items():
+            with self.subTest(template=template):
+                response = self.auth_user.get(reverse_name)
+                self.assertTemplateUsed(response, template)
 
     def test_auth_user_can_follow_and_unfollow(self):
         """
@@ -195,31 +226,6 @@ class PostsPagesTest(TestCase):
         self.assertIsInstance(
             response.context.get('comment_form').fields.get('text'),
             forms.CharField)
-
-    def test_pages_uses_correct_template(self):
-        """
-        Во view-функциях используются соответствующие шаблоны.
-        Переопределена страница 404.
-        """
-        templates_page_names = {
-            '/not_exists_page/': 'core/404.html',
-            reverse('posts:index'):
-                'posts/index.html',
-            reverse('posts:group_list', kwargs={'slug': self.group_1.slug}):
-                'posts/group_list.html',
-            reverse('posts:profile', kwargs={'username': self.user.username}):
-                'posts/profile.html',
-            reverse('posts:post_detail', kwargs={'post_id': self.post_1.id}):
-                'posts/post_detail.html',
-            reverse('posts:post_create'):
-                'posts/post_create.html',
-            reverse('posts:post_edit', kwargs={'post_id': self.post_1.id}):
-                'posts/post_create.html',
-        }
-        for reverse_name, template in templates_page_names.items():
-            with self.subTest(template=template):
-                response = self.auth_user.get(reverse_name)
-                self.assertTemplateUsed(response, template)
 
     def test_main_page_has_correct_context(self):
         """
