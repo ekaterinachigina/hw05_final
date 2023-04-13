@@ -97,7 +97,7 @@ class PostFormTests(TestCase):
         self.assertTrue(Post.objects.filter(
             text=self.form_data['text'],
             group=self.new_group,
-            author=self.test_user,
+            author=self.author,
             image='posts/post.bmp',
         ).exists())
 
